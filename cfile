@@ -1,0 +1,108 @@
+class CFile():
+    
+    def __init__(self, fn):
+           self.fn = fn
+           self.fr = None
+           self.iline = 0
+           try:
+               self.fr = open(fn, 'r')
+           except IOError:
+               print("Could not open file: {}".format(fn))
+       
+           
+            
+            
+    def getline(self, failoneof=False):
+        while True:
+            line = self.fr.readline()
+            if not line:
+                if failoneof:
+                    self.ereof()
+                else:
+                    return None
+            self.iline += 1
+            hash_pos = line.find('#')
+            if hash_pos == -1:
+               line = line
+            else:
+               line = line[0:hash_pos]
+            if line.isspace() or len(line) == 0:
+               continue
+            break
+        return line.strip()
+          
+        
+    def ereof(self, mes=""):
+        raise IOError("Unexpected end of file {} after line {}\n{}".format(self.fn, self.iline, mes))
+    
+        
+    def er(self, mes):
+       raise ValueError("Error at line {} of file {}:\n{}".format(self.iline, self.fn, mes))
+        
+      
+
+    def getlabel(self, lab, failoneof=True):
+      
+     found = False 
+     
+     
+     while found == False:
+         
+            dline = self.getline() 
+            if dline is None:
+                if failoneof == True:
+                    return None
+                elif failoneof == False:
+                    return None
+                
+            temp = dline.split(':',maxsplit=1)
+            temp2 = temp[0].strip()
+            if temp2.lower() == lab.strip().lower():
+                found = True
+                return temp[1].strip() 
+               
+     if found == False:
+        return None
+
+
+    def getreals(self, lab, n, vmin=None, vmax=None):
+       
+       values = self.getlabel(lab)
+       
+       
+       if values is None:
+           return None
+       
+       nums = values.split()
+        
+       if len(nums) != n or values[0].isalpha():
+           self.er("Expected {} real numbers".format(n))
+       else:
+           for num in nums:
+               if not num.isalpha():
+                   num = float(num)
+           if vmin is not None:
+               for num in nums:
+                   if float(num) < vmin:
+                       self.er("Expected real numbers >= {}, found {}".format(vmin, num))
+           if vmax is not None:
+               for num in nums:
+                   if float(num) > vmax:   
+                       self.er("Expected real numbers <= {}, found {}".format(vmax, num))
+       return num
+   
+        
+    def getchoice(self, lab, choices):
+        epilogi = self.getlabel(lab)
+        found = False
+        for i in choices:
+            if epilogi.strip().lower() == i.lower():
+                return i
+                found = True
+        if found == False:
+            self.er("Expected one of '{}', found '{}'".format(",".join(list(choices)), epilogi))            
+     
+    
+    def close(self):
+        self.fr.close()
+        
