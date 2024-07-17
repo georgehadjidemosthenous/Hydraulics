@@ -1,0 +1,872 @@
+import tkinter as tk
+from math import tan,pi,asin,sqrt,degrees,sin
+from hydro import RectChannel , TrapezChannel, CircleChannel
+from cfile import CFile 
+import tkinter.filedialog 
+
+#code the methods for draw circular channels
+class ChannelGUI:
+    
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("NTUA Dep.Civil Eng")
+        self.setButtons()
+        self.root.iconbitmap("icon.ico")
+        self.root.mainloop()
+        
+    def setButtons(self):  
+        
+        self.root.geometry("300x300")
+        self.root.configure(background="blue")
+        temp = tk.Label(self.root, text="Please, select a type of channel to continue")
+        temp.pack(anchor='center', pady=10, expand=True)
+        buttonR = tk.Button(self.root, text="Rectangular Channel", command=self.switch_rect)
+        buttonR.pack(anchor='center', pady=10, expand=True)
+        buttonT = tk.Button(self.root, text="Trapezoidal Channel", command=self.switch_trapez)
+        buttonT.pack(anchor='center', pady=10, expand=True)
+        buttonC = tk.Button(self.root, text="Circular Channel", command=self.switch_circ)
+        buttonC.pack(anchor='center', pady=10, expand=True)  
+        menuBar = tk.Menu(self.root, activebackground="green")
+        self.root.config(menu=menuBar)
+        menuBar.add_command(label="About", command=self.info, foreground="blue")
+   
+    
+    def SetWidgets(self,i):    
+        
+        i+=1
+        self.canChan = tk.Canvas(self.root, height=200, background="lightblue")
+        self.canChan.grid(row=i, column=0, columnspan=3, sticky="we")
+        
+        i+= 1
+        temp = tk.Label(self.root, text="Hydraulic parameters")
+        temp.grid(row=i, column=0, columnspan=2, sticky="w")
+        
+        i+= 1
+        temp = tk.Label(self.root, text="Manning:") #widget for manning, n (input)
+        temp.grid(row=i, column=0, sticky="e")
+        self.entManning = tk.Entry(self.root, width=35)
+        self.entManning.grid(row=i, column=1, sticky="we")
+        buttonM = tk.Button(self.root, text="Suggest", command=self.Suggest, background="lightblue")
+        buttonM.grid(row=i, column=2, sticky="we")
+        
+        i+= 1
+        temp = tk.Label(self.root, text="Slope (%):") #widget for slope, s (input)
+        temp.grid(row=i, column=0, sticky="e")
+        self.entSlope = tk.Entry(self.root, width=35)
+        self.entSlope.grid(row=i, column=1, sticky="we")
+        
+        i+= 1
+        temp = tk.Label(self.root, text="Height (m):") #widget for height, h (inpu)
+        temp.grid(row=i, column=0, sticky="e")
+        self.entHeight = tk.Entry(self.root, width=35)
+        self.entHeight.grid(row=i, column=1, sticky="we")
+        
+        i+= 1
+        temp = tk.Label(self.root, text="Velocity (m/s):") #widget for velocity, v (output only)
+        temp.grid(row=i, column=0, sticky="e")
+        self.entVel = tk.Entry(self.root, width=35, state="readonly")
+        self.entVel.grid(row=i, column=1, sticky="we")
+        
+        i+= 1
+        temp = tk.Label(self.root, text="Discharge (m^3/s):") #widget for discharge, q (output only)
+        temp.grid(row=i, column=0, sticky="e")
+        self.entDis = tk.Entry(self.root, width=35)
+        self.entDis.grid(row=i, column=1, sticky="we")
+        
+          
+    def Suggest(self):
+        self.entManning.config(state=tk.NORMAL) #allow the widget to be modified
+        self.entManning.delete(0, tk.END) #deletes any exisitng text in the widget
+        self.entManning.insert(0,"{:.3f}".format(float(0.015)))
+        
+
+    def getVals(self):
+        
+            vals = []
+            for index in self.entManning, self.entSlope:
+                t = index.get().replace(",",".")
+                try: 
+                   temp = float(t)
+                except ValueError:
+                    temp = None
+                if temp is None or temp <=0:
+                    return None     
+                vals.append(temp)
+            return vals
+          
+    def write(self,filename,cname, s, n):
+        with open(filename,'w') as fw:
+            fw.write("Type:     {}\n".format(cname))
+            fw.write("Slope:    {:.1f} #%\n".format(s))
+            fw.write("Manning:  {:.3f}\n".format(n))
+            self.write2(fw)
+                  
+    def write2(self,fw):
+        pass
+    
+    def saveas(self):
+        
+        fw = tk.filedialog.asksaveasfile(parent=self.root, defaultextension=".hyd", title="Open file for save") #opens file dialog for the user to choose on which file the data will be saved
+        if fw is None: return #user cancelled save
+       
+        self.fw = fw
+        vals = self.getVals()
+        
+        if vals is None: 
+            tk.messagebox.showinfo("Error", "No data has been given", parent=self.root, icon=tk.messagebox.ERROR)
+            return
+        else:
+            self.filename = fw.name
+            self.write(self.filename, self.cname, vals[1], vals[0])
+    
+    
+    def save(self):
+        
+       try:  #checks if the data is already saved as
+            self.fw 
+       except AttributeError:
+           self.fw = None
+           
+       if self.fw is None:
+                    tk.messagebox.showinfo("Error", "Please use the funciton save as to select a file first", parent=self.root, icon=tk.messagebox.ERROR)
+                    self.saveas()
+       else:
+                    vals = self.getVals() #gather all the data in the list Vals
+                    if vals is None: return
+                    self.write(self.filename, self.cname, vals[1], vals[0])
+    
+    
+    def readfile(self):
+        
+        fn = tk.filedialog.askopenfilename(parent=self.root, defaultextension=".hyd", title="open file for read") #opens the dialog for the user to select a file
+        
+        if fn is None: 
+            tk.messagebox.showinfo("Error", "File is empty", parent=self.root, icon=tk.messagebox.ERROR)
+            return
+       
+        try:
+            vals = self.getVals()
+        except TypeError:
+            vals = None            
+           
+        if vals!=None and len(vals)>0:
+            self.r = tk.messagebox.askokcancel("Data is not saved","ok to abandon changes?", default="cancel", parent=self.root)    
+            if self.r==True: #if r=true then user selected ok
+               try:
+                   self.read2(fn)
+               except ValueError:
+                   tk.messagebox.showinfo("Error", "Please check the file data or open a different file", parent=self.root, icon=tk.messagebox.ERROR)
+        else:
+            try:
+                self.read2(fn)
+            except ValueError:
+                tk.messagebox.showinfo("Error", "Please the check file data or open a different file", parent=self.root, icon=tk.messagebox.ERROR)
+   
+    
+    def read(self,fn):
+        
+        cf = CFile(fn)
+        self.entManning.config(state=tk.NORMAL) #allow the widget to be modified
+        self.entManning.delete(0, tk.END) #deletes any exisitng text in the widget
+        self.entManning.insert(0, "{:.3f}".format(float(cf.getreals("Manning", 1, vmin=0.001, vmax=0.100)))) #inser the value in the widget
+        
+        cf2 = CFile(fn)
+        self.entSlope.config(state=tk.NORMAL) #allow the widget to be modified
+        self.entSlope.delete(0, tk.END) #deletes any exisitng text in the widget
+        self.entSlope.insert(0, "{:.3f}".format(float(cf2.getreals("Slope", 1, vmin=0.01, vmax=100)))) #inser the value v in the widget
+    
+        cf4 = CFile(fn)
+        temp = cf4.getreals("Discharge", 1)
+        if temp != None:
+            self.entDis.config(state=tk.NORMAL) #allow the widget to be modified
+            self.entDis.delete(0, tk.END) #deletes any exisitng text in the widget
+            self.entDis.insert(0, "{:.3f}".format(float(temp))) #inser the value in the widget   
+        
+        cf5 = CFile(fn)            
+        temp = cf5.getreals("Height", 1, vmin=0, vmax=None)
+        if temp != None:
+            self.entHeight.config(state=tk.NORMAL) #allow the widget to be modified
+            self.entHeight.delete(0, tk.END) #deletes any exisitng text in the widget
+            self.entHeight.insert(0, "{:.3f}".format(float(temp))) #inser the value in the widget
+           
+        cf6 = CFile(fn)            
+        temp = cf6.getreals("Velocity", 1)
+        if temp != None:
+            self.entVel.config(state=tk.NORMAL) #allow the widget to be modified
+            self.entVel.delete(0, tk.END) #deletes any exisitng text in the widget
+            self.entVel.insert(0, "{:.3f}".format(float(temp))) #inser the value in the widget
+        
+   
+    def info(self):
+        tk.messagebox.showinfo("", "This is a GUI that calculates the hydraulic parameters of three geometrically different channels and draws their cross-section. Developed by George Hadjidemosthenous(CV21706) for the academic year of 2023-2024.", parent=self.root, icon=tk.messagebox.INFO)
+        
+    def switch_rect(self):
+       RectGUI(self.root)#creates the rect gui window which is assinged to the variable rectgui
+    
+    def switch_trapez(self):
+       TrapezGUI(self.root)
+
+    
+    def switch_circ(self):
+       CircGUI(self.root)
+    
+    
+    def telos(self):
+        "Delete all references to widgets and then destroy the root window."
+        try:    
+             self.fw
+        except AttributeError: self.fw = None
+        
+        vals = self.getVals()
+        
+        if vals is None:
+            self.root.destroy()
+        
+        elif self.fw == None and vals != None:
+            self.r = tk.messagebox.askokcancel("Data is not saved","ok to abandon changes?", default="cancel", parent=self.root)
+            if self.r == True: #user selected ok
+                self.delete2()
+        else: 
+            self.delete2()
+    
+    def SetMenus(self):
+        
+        menuBar = tk.Menu(self.root, activebackground="green")
+        self.root.config(menu=menuBar)
+        
+        menu1 = tk.Menu(menuBar, activebackground="green", tearoff=False)
+        menuBar.add_cascade(label="File", menu=menu1, foreground="blue")
+        menu1.add_command(label="Save as", command=self.saveas, foreground="blue")
+        menu1.add_separator()
+        menu1.add_command(label="Save", command=self.save, foreground="blue")
+        menu1.add_separator()
+        menu1.add_command(label="Open file", command=self.readfile, foreground="blue")
+        
+        menu2 = tk.Menu(menuBar, activebackground="green", tearoff=False)
+        menuBar.add_cascade(label="Compute", menu=menu2, foreground="blue")
+        menu2.add_command(label="Calculate Discharge", command=self.calcDischarge, foreground="blue")
+        menu2.add_separator()   
+        menu2.add_command(label="Calculate flow depth", command=self.calcFlowDepth, foreground="blue")
+        menu2.add_separator()  
+        menu2.add_command(label="Draw cross-section of pipeline", command=self.draw, foreground="blue")
+        
+        return menuBar
+ 
+class RectGUI(ChannelGUI):
+    
+    
+    def __init__(self,parent):
+        "A tkinter window for hydraulics."
+        
+        self.root = tk.Toplevel(parent)
+        self.root.title("Eπίλυση ανοικτών ορθογωνικών αγωγών")
+        self.filename = "untitled"
+        self.root.protocol("WM_DELETE_WINDOW", self.telos)
+        self.SetWidgetsRect()
+        self.SetMenusRect()
+        self.root.iconbitmap("icon.ico")
+        self.cname = "Rectangular"
+        self.root.mainloop()
+        
+        
+    def SetWidgetsRect(self):    
+        
+        i=0
+        temp = tk.Label(self.root, text="Geometry of rectangular channel")
+        temp.grid(row=i, column=0, columnspan=2, sticky="w")
+        
+        i+=1
+        temp = tk.Label(self.root, text="Width (m):") #widget for width, b (input)
+        temp.grid(row=i, column=0, sticky="e")
+        self.entWidth = tk.Entry(self.root, width=35)
+        self.entWidth.grid(row=i, column=1, sticky="we")
+    
+        self.SetWidgets(i)
+        self.root.columnconfigure(1, weight=1)
+                                   
+    def calcFlowDepth(self):
+    
+        vals = self.getVals()      
+        if vals is None:
+            tk.messagebox.showinfo("Error", "Please enter the Slope and Manning coefficient", parent=self.root, icon=tk.messagebox.ERROR)
+        try:
+            s = float(vals[1])
+            n = float(vals[0])
+            b = float(self.entWidth.get())
+        except ValueError:
+            tk.messagebox.showinfo("Error", "Please enter a valid number", parent=self.root, icon=tk.messagebox.ERROR)
+            return
+        
+        Rc= RectChannel(s, n, b)       
+        
+        if (self.entHeight.get() == "") or (self.entDis.get() != "" and self.entHeight.get() != "") :  #we use the discharge to calc the flow depth (H), if the height and discharge are inputed we use the height and replace the discharge
+             try:
+                 q = float(self.entDis.get())
+             except ValueError:
+                 q = None
+             if q <= 0 or q is None:
+                 tk.messagebox.showinfo("Error", "Discharge is not a positive number", parent=self.root, icon=tk.messagebox.ERROR)
+                 self.entDis.focus_set()
+                 return
+             else:  
+                v, h = Rc.depth(float(self.entDis.get()))
+                if  h==-1:
+                        tk.messagebox.showinfo("Error", "Discharge should be lower than {:.2f}".format(v), parent=self.root, icon=tk.messagebox.ERROR)
+                        self.entDis.focus_set() 
+                else:
+                        self.entVel.config(state=tk.NORMAL) #allow the widget to me modified
+                        self.entVel.delete(0, tk.END) #deletes any exisitng text in the widget
+                        self.entVel.insert(0, "{:.3f}".format(v)) #inser the value v in the widget
+                        self.entHeight.config(state=tk.NORMAL)
+                        self.entHeight.delete(0, tk.END)
+                        self.entHeight.insert(0, "{:.3f}".format(h))
+                        self.entVel.config(state="readonly")#changes the status of the widget to readonly
+                
+    def calcDischarge(self):
+        
+        vals = self.getVals()      
+        if vals is None:
+            tk.messagebox.showinfo("Error", "Please enter the Slope and Manning coefficient", parent=self.root, icon=tk.messagebox.ERROR)
+        try:
+            s = float(vals[1])
+            n = float(vals[0])
+            b = float(self.entWidth.get())
+        except ValueError:
+            tk.messagebox.showinfo("Error", "Please enter a valid number", parent=self.root, icon=tk.messagebox.ERROR)
+            return
+        
+        Rc= RectChannel(s, n, b)
+                      
+        if (self.entDis.get() == "") or (self.entDis.get() != "" and self.entHeight.get() != ""): #we us the height to calc the discharge (Q)
+            try:
+                h = float(self.entHeight.get())
+            except ValueError:
+                h = None
+            if h <= 0 or h is None:
+                tk.messagebox.showinfo("Error", "Height is not a positive number", parent=self.root, icon=tk.messagebox.ERROR)
+                self.entHeight.focus_set()
+                return
+            else:
+              v, q = Rc.discharge(float(self.entHeight.get()))
+              if v==-1 or q==-1:
+                      tk.messagebox.showinfo("Error", "Height exceeds the maximum limit", parent=self.root, icon=tk.messagebox.ERROR)
+                      self.entHeight.focus_set()
+              else:
+                  self.entVel.config(state=tk.NORMAL) #allow the widget to be modified
+                  self.entVel.delete(0, tk.END) #deletes any exisitng text in the widget
+                  self.entVel.insert(0, "{:.3f}".format(v)) #inser the value v in the widget
+                  self.entVel.config(state="readonly")
+                  self.entDis.config(state=tk.NORMAL)
+                  self.entDis.delete(0, tk.END)
+                  self.entDis.insert(0, "{:.3f}".format(q))
+                  
+    def draw(self):
+        
+            dc = self.canChan
+            vals = self.getVals()
+            vals.append(float(self.entWidth.get()))
+            vals.append(float(self.entHeight.get()))
+            vals.append(float(self.entDis.get()))
+            vals.append(float(self.entVel.get()))
+            
+            
+            dc.update_idletasks() # _idletasks breaks WinDoze 98 support
+            dcw = dc.winfo_width() # Pixels, calc the width of the canvas
+            dch = dc.winfo_height() # Pixels, calc the height of the canvas
+            
+            if dcw < 2 or dch < 2: return #checks the dimension of the canvas, tkinter reported wrong width or height
+            
+            perx = dcw*0.05 #Margin x
+            pery = dch*0.05 #Margin y
+            dcwef = dcw - 2*perx #Effective width is now smaller(times 2 for each side)
+            dchef = dch - 2*pery #Effective height is now smaller(times 2 for each side)
+            dc.delete(tk.ALL) # Clear window
+            
+            hchan = vals[3]*1.1 #Height of channel is bigger than water level
+            bchan = vals[2] #width of channel
+            
+            akl = dcwef/bchan #ratio of canvas to channel width  
+            akly= dchef/hchan #ratio of canvas to channel height
+            
+            if akly < akl: akl = akly #to ensure the graph fits in the canvas
+            def topix(x, y): return perx+x*akl, dch-(pery+y*akl) #calc the pixel cord of the canvas according to the scaling function and margins
+            cs = ( (0, 0), (vals[2], vals[3]) ) #Draw water surface
+            cs = [topix(x, y) for x, y in cs] #translates the pixel cord to the canvas
+            dc.create_rectangle(cs, fill="cyan", outline=None, stipple="gray25")
+            cs = ( (0, vals[3]), (bchan, vals[3]) ) #Draw water level
+            cs = [topix(x, y) for x, y in cs]
+            dc.create_line(cs, fill="blue", width=3)
+            cs = ( (0, hchan), (0, 0), (bchan, 0), (bchan, hchan) ) #Draw channel
+            cs = [topix(x, y) for x, y in cs]
+            dc.create_line(cs, fill="black", width=3)
+
+    def write2(self,fw): 
+        
+        fw.write("Bottom Width:  {:.1f}  #m\n".format(float(self.entWidth.get())))
+        fw.write("Height:        {:.3f}  #m\n".format(float(self.entHeight.get())))
+        fw.write("\n")
+        fw.write("Discharge:     {:.1f}  #m^3/s \n".format(float(self.entDis.get())))
+        fw.write("Velocity:      {:.3f}  #m/s".format(float(self.entVel.get())))
+        fw.close()
+    
+                   
+    def read2(self,fn):
+       
+        self.read(fn)
+        cf3 = CFile(fn)
+        self.entWidth.config(state=tk.NORMAL) #allow the widget to be modified
+        self.entWidth.delete(0, tk.END) #deletes any exisitng text in the widget
+        self.entWidth.insert(0, "{:.3f}".format(float(cf3.getreals("Bottom width", 1, 0.001, 10000)))) #inser the value v in the widget
+      
+                
+    def delete2(self):
+        
+        del self.entManning, self.entWidth, self.entHeight, self.entSlope, self.entVel, self.entDis
+        self.root.destroy()
+        
+    
+    def SetMenusRect(self):
+        
+        menuBar = self.SetMenus()
+        menu3 = tk.Menu(menuBar, activebackground="green", tearoff=False)
+        menuBar.add_cascade(label="Type", menu=menu3, foreground="blue")
+        menu3.add_command(label="Trapezoidal", command=self.switch_trapez, foreground="blue")
+        menu3.add_separator()
+        menu3.add_command(label="Circular", command=self.switch_circ, foreground="blue")
+        menuBar.add_command(label="Exit", command=self.telos, foreground="blue")
+        
+
+class TrapezGUI(ChannelGUI):
+ 
+    
+    def __init__(self,parent):
+            
+        self.root = tk.Toplevel(parent)
+        self.root.title("Eπίλυση ανοικτών τραπεζοειδών αγωγών")
+        self.filename = "untitled"
+        self.root.protocol("WM_DELETE_WINDOW", self.telos)
+        self.SetWidgetsTrap()
+        self.SetMenusTrap()
+        self.root.iconbitmap("icon.ico")
+        self.cname = "Trapezoidal"
+        self.root.mainloop()
+        
+    def SetWidgetsTrap(self):    
+       
+       i=0
+       temp = tk.Label(self.root, text="Geometry of trapezoidal channel")
+       temp.grid(row=i, column=0, columnspan=2, sticky="w") 
+       
+       i+= 1
+       temp = tk.Label(self.root, text="Width (m):") #widget for width, b (input)
+       temp.grid(row=i, column=0, sticky="e")
+       self.entWidth = tk.Entry(self.root, width=35)
+       self.entWidth.grid(row=i, column=1, sticky="we")
+       
+       i+= 1
+       temp = tk.Label(self.root, text="Bank Angle Left (deg):") #widget for bank angle 1 (input)
+       temp.grid(row=i, column=0, sticky="e")
+       self.entt1 = tk.Entry(self.root, width=35)
+       self.entt1.grid(row=i, column=1, sticky="we")
+
+       i+= 1
+       temp = tk.Label(self.root, text="Bank Angle Right (deg):") #widget for bank angke 2 (input)
+       temp.grid(row=i, column=0, sticky="e")
+       self.entt2 = tk.Entry(self.root, width=35)
+       self.entt2.grid(row=i, column=1, sticky="we")
+       
+       self.SetWidgets(i)
+       self.root.columnconfigure(1, weight=1)
+ 
+    def calcFlowDepth(self):
+    
+        vals = self.getVals()      
+        if vals is None:
+            tk.messagebox.showinfo("Error", "Please enter the Slope and Manning coefficient", parent=self.root, icon=tk.messagebox.ERROR)
+        try: #check if all the inputs are numbers
+            s = float(vals[1])
+            n = float(vals[0])
+            b = float(self.entWidth.get())
+            t1 = (float(self.entt1.get())*pi/180)
+            t2 = (float(self.entt2.get())*pi/180)
+        except ValueError:
+            tk.messagebox.showinfo("Error", "Please enter a valid number", parent=self.root, icon=tk.messagebox.ERROR)
+            return
+        
+        Tr = TrapezChannel(s, n, b, t1, t2)       
+        
+        if (self.entHeight.get() == "") or (self.entDis.get() != "" and self.entHeight.get() != ""):  #we use the discharge to calc the flow depth (H), if the height and discharge are inputed we use the height and replace the discharge
+             try:
+                 q = float(self.entDis.get())
+             except ValueError:
+                 tk.messagebox.showinfo("Error", "Please enter a number", parent=self.root, icon=tk.messagebox.ERROR)
+                 self.entDis.focus_set()
+             if q <= 0 or q is None:
+                 tk.messagebox.showinfo("Error", "Discharge is not a positive number", parent=self.root, icon=tk.messagebox.ERROR)
+                 self.entDis.focus_set()
+                 return
+             else:  
+                v, h = Tr.depth(float(self.entDis.get()))
+                if h==-1:
+                        tk.messagebox.showinfo("Error", "Discharge should be lower than {:.2f}".format(v), parent=self.root, icon=tk.messagebox.ERROR)
+                        self.entDis.focus_set()   
+                elif v==-2 or h==-2:
+                        tk.messagebox.showinfo("Error", "Angle is not in the correct range, enter values in the range of 1-179", parent=self.root, icon=tk.messagebox.ERROR)
+                        self.entt1.focus_set()        
+                else:        
+                    self.entVel.config(state=tk.NORMAL) #allow the widget to me modified
+                    self.entVel.delete(0, tk.END) #deletes any exisitng text in the widget
+                    self.entVel.insert(0, "{:.3f}".format(v)) #inser the value v in the widget
+                    self.entVel.config(state="readonly")
+                    self.entHeight.config(state=tk.NORMAL)
+                    self.entHeight.delete(0, tk.END)
+                    self.entHeight.insert(0, "{:.3f}".format(h))  
+  
+                    
+    def calcDischarge(self):
+         
+         vals = self.getVals()      
+         if vals is None:
+            tk.messagebox.showinfo("Error", "Please enter the Slope and Manning coefficient", parent=self.root, icon=tk.messagebox.ERROR)
+         try: #check if all the inputs are numbers
+            s = float(vals[1])
+            n = float(vals[0])
+            b = float(self.entWidth.get())
+            t1 = (float(self.entt1.get())*pi/180)
+            t2 = (float(self.entt2.get())*pi/180)
+         except ValueError:
+            tk.messagebox.showinfo("Error", "Please enter a valid number", parent=self.root, icon=tk.messagebox.ERROR)
+            return
+        
+         Tr = TrapezChannel(s, n, b, t1, t2)
+                       
+         if (self.entDis.get() == "") or (self.entDis.get() != "" and self.entHeight.get() != ""): #we us the height to calc the discharge (Q)
+             try:
+                 h = float(self.entHeight.get())
+             except ValueError:
+                 h = None
+             if h <= 0 or h is None:
+                 tk.messagebox.showinfo("Error", "Height is not a positive number", parent=self.root, icon=tk.messagebox.ERROR)
+                 self.entHeight.focus_set()
+                 return
+             else:
+               v, q = Tr.discharge(float(self.entHeight.get()))
+               if v==-1 or q==-1:
+                       tk.messagebox.showinfo("Error", "Height exceeds the maximum limit", parent=self.root, icon=tk.messagebox.ERROR)
+                       self.entHeight.focus_set()
+               elif v==-2 or q==-2:
+                       tk.messagebox.showinfo("Error", "Angle is not in the correct range, enter values in the range of 1-179", parent=self.root, icon=tk.messagebox.ERROR)
+                       self.entt1.focus_set()
+               else:
+                   self.entVel.config(state=tk.NORMAL) #allow the widget to be modified
+                   self.entVel.delete(0, tk.END) #deletes any exisitng text in the widget
+                   self.entVel.insert(0, "{:.3f}".format(v)) #inser the value v in the widget
+                   self.entVel.config(state="readonly")
+                   self.entDis.config(state=tk.NORMAL)
+                   self.entDis.delete(0, tk.END)
+                   self.entDis.insert(0, "{:.3f}".format(q))
+                   
+    def draw(self):
+       
+        dc = self.canChan
+        vals = self.getVals()
+        vals.append(float(self.entWidth.get()))   
+        vals.append(float(self.entHeight.get()))  
+        vals.append(float(self.entDis.get()))     
+        vals.append(float(self.entVel.get()))     
+        vals.append(float(self.entt1.get())*pi/180)      
+        vals.append(float(self.entt2.get())*pi/180)
+    
+        dc.update_idletasks()  # Ensure canvas is updated
+        dcw = dc.winfo_width()  # Canvas width in pixels
+        dch = dc.winfo_height()  # Canvas height in pixels
+    
+        if dcw < 2 or dch < 2: return  # Ensure canvas dimensions are valid
+        perx = dcw * 0.05  # Margin x
+        pery = dch * 0.05  # Margin y
+        dcwef = dcw - 2*perx  # Effective canvas width
+        dchef = dch - 2*pery  # Effective canvas height
+        dc.delete(tk.ALL)  # Clear canvas
+        
+        hchan = vals[3] * 1.1  # Height of channel
+        bchan = vals[2]  # Base width of channel
+        t1 = vals[6]  # bank angle 1
+        t2 = vals[7]  # bank angle 2
+        
+        top_width = bchan + hchan*tan(t1)+ hchan*tan(t2)
+        akl = dcwef / top_width  # Scale factor for width
+        akly = dchef / hchan  # Scale factor for height
+        if akly < akl:akl = akly  # Ensure the channel fits in the canvas
+            
+        def topix(x, y): return perx+x*akl, dch-(pery+y*akl)  # Convert to canvas coordinates
+        # Define points for the water surface
+        cs = [(0,vals[3]), (vals[3]*tan((t1)), 0), (bchan, 0), (bchan+(vals[3]*tan(t2)), vals[3])]  
+        cs = [topix(x, y) for x, y in cs]  # Translate to canvas coordinates
+        dc.create_polygon(cs, fill="cyan", outline=None, stipple="gray25")
+        
+        # Draw water level
+        water_level_cs = [(0, vals[3]), (bchan+(vals[3]*tan(t2)), vals[3])]     
+        water_level_cs = [topix(x, y) for x, y in water_level_cs]
+        dc.create_line(water_level_cs, fill="blue", width=3)
+        
+        #Draw channel outline
+        cs = [(0,hchan), (hchan*tan((t1)), 0), (bchan, 0), (bchan+(hchan*tan(t2)), hchan)]  
+        cs = [topix(x, y) for x,y in cs]
+        dc.create_line(cs, fill="black", width=3)
+   
+    
+    def write2(self,fw): 
+        
+        fw.write("Bottom Width:      {:.1f}  #m\n".format(float(self.entWidth.get())))
+        fw.write("Height:            {:.3f}  #m\n".format(float(self.entHeight.get())))
+        fw.write("Bank angle Left:   {:.3f}  #deg\n".format(float(self.entt1.get())))
+        fw.write("Bank angle Right:  {:.3f}  #deg\n".format(float(self.entt2.get())))
+        fw.write("\n")
+        fw.write("Discharge:         {:.1f}  #m^3/s \n".format(float(self.entDis.get())))
+        fw.write("Velocity:          {:.3f}  #m/s".format(float(self.entVel.get())))
+        fw.close()
+
+
+    def read2(self,fn):
+        
+        self.read(fn)
+        
+        cf3 = CFile(fn)
+        self.entWidth.config(state=tk.NORMAL) #allow the widget to be modified
+        self.entWidth.delete(0, tk.END) #deletes any exisitng text in the widget
+        self.entWidth.insert(0, "{:.3f}".format(float(cf3.getreals("Bottom width", 1, 0.001, 10000)))) 
+        
+        cf4 = CFile(fn)
+        self.entt1.config(state=tk.NORMAL) #allow the widget to be modified
+        self.entt1.delete(0, tk.END) #deletes any exisitng text in the widget
+        self.entt1.insert(0, "{:.3f}".format(float(cf4.getreals("Bank Angle Left", 1, 1, 179))))
+        
+        cf5 = CFile(fn)
+        self.entt2.config(state=tk.NORMAL) #allow the widget to be modified
+        self.entt2.delete(0, tk.END) #deletes any exisitng text in the widget
+        self.entt2.insert(0, "{:.3f}".format(float(cf5.getreals("Bank Angle Right", 1, 1, 179))))
+    
+    
+    def delete2(self):
+        del self.entManning, self.entWidth, self.entHeight, self.entSlope, self.entVel, self.entDis,self.entt1,self.entt2
+        self.root.destroy()
+    
+    def SetMenusTrap(self):
+        
+        menuBar = self.SetMenus()
+        menu3 = tk.Menu(menuBar, activebackground="green", tearoff=False)
+        menuBar.add_cascade(label="Type", menu=menu3, foreground="blue")
+        menu3.add_command(label="Rectangular", command=self.switch_rect, foreground="blue")
+        menu3.add_separator()
+        menu3.add_command(label="Circular", command=self.switch_circ, foreground="blue")
+        menuBar.add_command(label="Exit", command=self.telos, foreground="blue")
+    
+class CircGUI(ChannelGUI):
+ 
+    
+    def __init__(self,parent):
+        
+        
+        self.root = tk.Toplevel(parent)
+        self.root.title("Eπίλυση ανοικτών κυκλικών αγωγών")
+        self.filename = "untitled"
+        self.root.iconbitmap("icon.ico")
+        self.root.protocol("WM_DELETE_WINDOW", self.telos)
+        self.SetWidgetsCirc()
+        self.SetMenusCirc()
+        self.cname = "Circular"
+        self.root.mainloop()
+    
+    def SetWidgetsCirc(self):
+        
+        i=0
+        temp = tk.Label(self.root, text="Geometry of circular channel")
+        temp.grid(row=i, column=0, columnspan=2, sticky="w")
+        
+        i+= 1
+        temp = tk.Label(self.root, text="Diameter (m):") #widget for bank angke 2 (input)
+        temp.grid(row=i, column=0, sticky="e")
+        self.entDiameter = tk.Entry(self.root, width=35)
+        self.entDiameter.grid(row=i, column=1, sticky="we")
+             
+        self.SetWidgets(i)
+        self.root.columnconfigure(1, weight=1)
+    
+  
+    def calcFlowDepth(self):
+    
+        vals = self.getVals()      
+        if vals is None:
+            tk.messagebox.showinfo("Error", "Please enter the Slope and Manning coefficient", parent=self.root, icon=tk.messagebox.ERROR)
+        try:
+            s = float(vals[1])
+            n = float(vals[0])
+            D = float(self.entDiameter.get())
+        except ValueError:
+            tk.messagebox.showinfo("Error", "Please enter a valid number", parent=self.root, icon=tk.messagebox.ERROR)
+            return
+        
+        Cc= CircleChannel(s, n, D)   
+        if (self.entHeight.get() == "") or (self.entDis.get() != "" and self.entHeight.get() != "") :  #we use the discharge to calc the flow depth (H), if the height and discharge are inputed we use the height and replace the discharge
+             try:
+                 q = float(self.entDis.get())
+             except ValueError:
+                 q = None
+             if q <= 0 or q is None:
+                 tk.messagebox.showinfo("Error", "Discharge is not a positive number", parent=self.root, icon=tk.messagebox.ERROR)
+                 self.entDis.focus_set()
+                 return
+             else:  
+                v, h = Cc.depth(float(self.entDis.get()))
+                if h==-1:
+                        tk.messagebox.showinfo("Error", "Discharge should be lower than {:.2f}".format(v), parent=self.root, icon=tk.messagebox.ERROR)
+                        self.entDis.focus_set() 
+                elif v==-2 or h==-2:
+                         tk.messagebox.showinfo("Error", "Diameter should be greater than zero and smaler than 250", parent=self.root, icon=tk.messagebox.ERROR)
+                         self.entDiameter.focus_set() 
+                else:
+                        self.entVel.config(state=tk.NORMAL) #allow the widget to me modified
+                        self.entVel.delete(0, tk.END) #deletes any exisitng text in the widget
+                        self.entVel.insert(0, "{:.3f}".format(v)) #inser the value v in the widget
+                        self.entHeight.config(state=tk.NORMAL)
+                        self.entHeight.delete(0, tk.END)
+                        self.entHeight.insert(0, "{:.3f}".format(h))
+                        self.entVel.config(state="readonly")#changes the status of the widget to readonly
+    
+    def calcDischarge(self):
+          
+          vals = self.getVals() 
+          if vals is None:
+              tk.messagebox.showinfo("Error", "Not a positive number", parent=self.root, icon=tk.messagebox.ERROR)
+              
+          try:
+              s = float(vals[1])
+              n = float(vals[0])
+              D = float(self.entDiameter.get())
+          except ValueError:
+             tk.messagebox.showinfo("Error", "Please enter a number", parent=self.root, icon=tk.messagebox.ERROR)
+             return
+         
+          Cc = CircleChannel(s, n, D)
+                       
+          if (self.entDis.get() == "") or (self.entDis.get() != "" and self.entHeight.get() != ""): #we us the height to calc the discharge (Q)
+              try:
+                  h = float(self.entHeight.get())
+              except ValueError:
+                  h = None
+              if h <= 0 or h is None:
+                  tk.messagebox.showinfo("Error", "Height is not a positive number", parent=self.root, icon=tk.messagebox.ERROR)
+                  self.entHeight.focus_set()
+                  return
+              else:
+                v, q = Cc.discharge(float(self.entHeight.get()))
+                if v==-1 or q==-1:
+                        tk.messagebox.showinfo("Error", "Height should be greater than zero and smaller than {}".format(D), parent=self.root, icon=tk.messagebox.ERROR)
+                        self.entHeight.focus_set()
+                elif v==-2 or q==-2:
+                        tk.messagebox.showinfo("Error", "Diameter is not in the correct range, enter values greater than zero and smaller than 250", parent=self.root, icon=tk.messagebox.ERROR)
+                        self.entDiameter.focus_set()
+                else:
+                    self.entVel.config(state=tk.NORMAL) #allow the widget to be modified
+                    self.entVel.delete(0, tk.END) #deletes any exisitng text in the widget
+                    self.entVel.insert(0, "{:.3f}".format(v)) #inser the value v in the widget
+                    self.entVel.config(state="readonly")
+                    self.entDis.config(state=tk.NORMAL)
+                    self.entDis.delete(0, tk.END)
+                    self.entDis.insert(0, "{:.3f}".format(q))   
+    
+    
+    def draw(self):
+       
+        dc = self.canChan
+        vals = self.getVals()
+        vals.append(float(self.entDiameter.get()))  
+        vals.append(float(self.entHeight.get()))    
+        vals.append(float(self.entDis.get()))       
+        vals.append(float(self.entVel.get()))       
+    
+        dc.update_idletasks()  # Ensure canvas is updated
+        dcw = dc.winfo_width()  # Canvas width in pixels
+        dch = dc.winfo_height()  # Canvas height in pixels
+    
+        if dcw < 2 or dch < 2: return  # Ensure canvas dimensions are valid
+        perx = dcw * 0.05  # Margin x
+        pery = dch * 0.05  # Margin y
+        dcwef = dcw - 2 * perx  # Effective canvas width
+        dchef = dch - 2 * pery  # Effective canvas height
+        dc.delete(tk.ALL)  # Clear canvas
+        dchan = vals[2]  # Diameter of the channel
+        hchan = vals[3]*1.1  # channel height   
+        akl = dcwef / dchan  # Scale factor for width
+        akly = dchef / dchan  # Scale factor for height
+        if akly < akl:akl = akly  # Ensure the channel fits in the canvas
+    
+        def topix(x, y):return perx+x*akl, dch-(pery+y*akl)  # Convert to canvas coordinates
+        radius = dchan / 2  
+        T = 2*sqrt(vals[3]*(dchan-vals[3]))
+        if hchan>radius:
+            z = 2*pi - 2*asin(T/dchan) #z is the angle of the circular channel
+        elif hchan<=radius:
+            z = 2*asin(T/dchan)    
+        angle = degrees(z)
+        B = sin(z/2) * dchan
+        
+        #draw water surface
+        water_surface_cs = [(0,vals[3]),(B,0)]
+        water_surface_px = [topix(x, y) for x, y in water_surface_cs]
+        bbox = [coord for point in water_surface_px for coord in point]
+        print(bbox)
+        dc.create_oval(bbox, fill="cyan", outline=None, stipple="gray25")
+        
+        #draw water level
+        scale = vals[3]/dchan
+        water_level_cs = [(0, vals[3]*scale), (B, vals[3]*scale)]
+        water_level_px = [topix(x, y) for x, y in water_level_cs]
+        print(water_level_px)
+        dc.create_line(water_level_px, fill="blue", width=3)
+        
+        #draw channel arc
+        channel_Arc_cs = [(0,hchan), (B,0)]
+        channel_Arc_bbox = [topix(x, y) for x,y in channel_Arc_cs]
+        channel_Arc_bbox_flat = [coord for point in channel_Arc_bbox for coord in point]
+        print(channel_Arc_bbox_flat)
+        dc.create_arc(channel_Arc_bbox_flat, start=(-90+angle/2), extent=-angle, style=tk.ARC, fill="black", width=3)
+
+    
+    def write2(self,fw): 
+        
+        fw.write("Diameter:   {:.1f}  #m\n".format(float(self.entDiameter.get())))
+        fw.write("Height:     {:.3f}  #m\n".format(float(self.entHeight.get())))
+        fw.write("\n")
+        fw.write("Discharge:  {:.1f}  #m^3/s \n".format(float(self.entDis.get())))
+        fw.write("Velocity:   {:.3f}  #m/s".format(float(self.entVel.get())))
+        fw.close()
+    
+    
+    def read2(self,fn):
+        
+        self.read(fn)
+        cf3 = CFile(fn)
+        self.entDiameter.config(state=tk.NORMAL) #allow the widget to be modified
+        self.entDiameter.delete(0, tk.END) #deletes any exisitng text in the widget
+        self.entDiameter.insert(0, "{:.3f}".format(float(cf3.getreals("Diameter", 1, 0, None)))) #inser the value v in the widget
+       
+    
+    def delete2(self):
+        del self.entManning, self.entDiameter, self.entHeight, self.entSlope, self.entVel, self.entDis
+        self.root.destroy()
+            
+            
+    def SetMenusCirc(self):
+        
+        menuBar = self.SetMenus()
+        menu3 = tk.Menu(menuBar, activebackground="green", tearoff=False)
+        menuBar.add_cascade(label="Type", menu=menu3, foreground="blue")
+        menu3.add_command(label="Rectangular", command=self.switch_rect, foreground="blue")
+        menu3.add_separator()
+        menu3.add_command(label="Trapezoidal", command=self.switch_trapez, foreground="blue")
+        menuBar.add_command(label="Exit", command=self.telos, background="blue")
+     
+if __name__ == "__main__":
+    channelgui = ChannelGUI()        
+   
