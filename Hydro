@@ -1,0 +1,243 @@
+from math import sqrt,pow,pi,sin,asin,acos
+
+
+
+def bisecroot(f, a, b, eps):
+        iterations=0
+        maxiter=30
+        while iterations<=maxiter:
+            x=a+((b-a)/2)
+            if abs((b-a)/2)<=eps:
+                return x
+            elif f(a)*f(x)<0:
+                b=x
+            else:
+                a=x
+            iterations+=1
+        else:
+           x=None
+           return x, "max number of iterations exceeded"
+
+
+class Channel:
+    cname = "Channel"
+
+   
+    def __init__(self, s=0.005, n=0.015):
+        self.s = s
+        self.n = n
+        self.hmax = 250
+    
+    def perarea(self, h):
+        if h<0 or h>1600:
+            p=-1
+            a=-1
+            return p, a
+        else:
+             assert False, "method perarea() must be overwritten" 
+     
+    def discharge(self, h):
+        if h<0 or h>1600:
+            v = -1
+            q = -1
+            return v, q
+        elif h==0: 
+            assert False, "method perarea() must be overwritten" 
+        else: 
+            v = -1
+            q = -1
+            return v, q
+        
+    def depth(self, q):
+        if q<0 or q>1e13:
+            v=-1
+            h=-1
+            return v, h
+        else:
+            assert False, "method perarea() must be overwritten"
+   
+    
+class RectChannel(Channel):
+    cname ="Rectangular"
+    
+    def __init__(self, s, n, b):
+        self.s = s/100
+        self.n = n
+        self.b = b
+             
+    def perarea(self,h):
+        if h<0 or h>250:
+           p=-1
+           a=-1
+           return p, a
+        else: 
+            p=self.b+(2*h)
+            a=self.b*h
+            return p, a
+        
+    def discharge(self, h):
+        if h<0 or h>250:
+            v = -1
+            q = -1
+            return v, q
+        elif h==0:
+             Rh=0
+        else:
+             Rh=(self.b*h)/(self.b+2*h)
+             v=(1/self.n)*(Rh**(2/3))*(self.s**0.5)
+             q=v*(self.b*h)
+             self.v = v
+             self.q = q
+             return v, q
+            
+    def depth(self, q):
+        vmax,qmax=self.discharge(250)  
+        if q<0 or q>qmax:
+           v=qmax #return qmax to show the user the correct range
+           h=-1
+           return v, h
+        else:
+           f= lambda x : (1/self.n)*(self.b*x)*pow(((self.b*x)/(self.b+2*x)),2/3)*sqrt(self.s)-q
+           eps=pow(10,-6)
+           h = bisecroot(f,0,self.b,eps)
+           v=q/(self.b*h)
+           return v, h
+      
+class TrapezChannel(Channel):
+    cname="Trapezoidal"
+    
+    def __init__(self, s, n, b, t1, t2):
+        self.s = s/100
+        self.n = n
+        self.b = b
+        self.t1 = t1
+        self.t2 = t2
+            
+    def perarea(self, h):
+       if h<0 or h>250 or (self.t1<0.0174532925 or self.t1>3.1241393611) or (self.t2<0.0174532925 or self.t2>3.1241393611):
+          p=-1
+          a=-1
+          return p, a
+       else:
+           p = self.b + h*(sqrt(1+pow(self.t1,2))+sqrt(1+pow(self.t2,2)))
+           a = (2*self.b+h*self.t1+h*self.t2)/2*h
+           return p, a
+       
+    def discharge(self, h):
+        
+        if (h<0 or h>250):
+            v = -1
+            q = -1
+            return v, q
+        elif (self.t1<0.0174532925 or self.t1>3.1241393611) or (self.t2<0.0174532925 or self.t2>3.1241393611):
+            v = -2
+            q = -2
+            return v,q
+        elif h==0: 
+            Rh = 0
+        else:
+             p, a = self.perarea(h)
+             Rh = a/p
+             v = (1/self.n)*pow(Rh,2/3)*sqrt(self.s)
+             q = v*a
+             self.v = v
+             self.q = q
+             return v, q
+             
+    def depth(self, q):
+        vmax,qmax=self.discharge(250)  
+        if q<0 or q>qmax:
+             v=qmax
+             h=-1
+             return v, h
+        elif (self.t1<0.0174532925 or self.t1>3.1241393611) or (self.t2<0.0174532925 or self.t2>3.1241393611):
+             v = -2
+             h = -2
+             return v,h
+        else:
+              z=(self.t1+self.t2)/2
+              f = lambda x : (1/self.n)*((self.b+z*x)*x)*pow((((self.b+z*x)*x)/(self.b+2*x*sqrt(1+pow(z,2)))),2/3)*sqrt(self.s)-q
+              eps=pow(10,-6)
+              h = bisecroot(f,0,self.b,eps)
+              v = q/((self.b+z*h)*h)
+              self.v = v
+              self.h = h
+              return v, h   
+    
+class CircleChannel(Channel):   
+    cname = "Circular"
+
+
+    def __init__(self, s, n, D):
+        self.s = s/100
+        self.n = n
+        self.D = D #diameter of circular channel
+        
+    def perarea(self, h):
+       if h<0 or h>250:
+          p=-1
+          a=-1
+          return p, a
+       T = 2 * sqrt(h*(self.D-h))
+       if h>(self.D/2):
+           z = 2*pi - 2*asin(T/self.D) #z is the angle of the circular channel
+       elif h<=(self.D/2):
+           z = 2*asin(T/self.D)   
+       p = 0.5 * z * self.D
+       a = 1/8*(z-sin(z))*(pow(self.D,2)) 
+       return p, a
+       
+    def discharge(self, h): #calculates the velocity and discharge using only the height , diameter , s and n
+         if (h<0 or h>250) or (h>self.D):
+             v = -1
+             q = -1
+             return v, q
+         elif self.D<0 or self.D>250:
+             v = -2 
+             q = -2
+             return v,q 
+         elif h==0: 
+              Rh = 0
+              v=q=0
+              return v, q
+         else:
+            p , a = self.perarea(h)
+            Rh = a/p
+            v = (1/self.n)*pow(Rh,2/3)*sqrt(self.s)
+            q = v*a
+            return v, q
+     
+    def funh(self, h, q):
+        R = self.D/2
+        theta = 2 * acos((R - h) / R)
+        a = R**2 * (theta - sin(theta)) / 2
+        p = R * theta
+        rh = a / p
+        funh = a * (rh)**(2 / 3) * (1/self.n) * sqrt(self.s) - q
+        return funh
+
+    def depth(self, q): #calculates the velocity and flow depth using the angle and discharge
+         
+        z = 2*pi
+        p = 0.5 * z * 250
+        a = 1/8*(z-sin(z))*(pow(250,2)) 
+        Rh = a/p
+        v = (1/self.n)*pow(Rh,2/3)*sqrt(self.s)
+        qmax = v*a
+        
+        if q<0 or q>qmax:
+             v=qmax
+             h=-1
+             return v, h
+        elif self.D<0 or self.D>=250:
+             v = -2 
+             q = -2
+             return v,q 
+            
+        else:
+              h = bisecroot(lambda h: self.funh(h,q), 1e-6 , self.D, 1e-4)
+              p, a = self.perarea(h)
+              rh = a/p
+              v = (1/self.n)*pow(rh,2/3)*sqrt(self.s)
+              return v, h
+          
